@@ -7,15 +7,25 @@ import 'cli_exception.dart';
 
 /// A single file returned by the endpoint for a screen.
 class ScreenFile {
-  ScreenFile({required this.target, required this.content});
+  ScreenFile({
+    required this.target,
+    required this.content,
+    this.encoding = 'utf8',
+  });
 
   /// Path relative to the project's `lib/` directory.
   final String target;
   final String content;
 
+  /// How [content] is encoded: `'utf8'` (plain text, the default) or
+  /// `'base64'` (binary, e.g. images/fonts). Defaults to `'utf8'` so older
+  /// responses without an `encoding` field keep working.
+  final String encoding;
+
   factory ScreenFile.fromJson(Map<String, dynamic> json) => ScreenFile(
         target: (json['target'] ?? '') as String,
         content: (json['content'] ?? '') as String,
+        encoding: (json['encoding'] ?? 'utf8') as String,
       );
 }
 

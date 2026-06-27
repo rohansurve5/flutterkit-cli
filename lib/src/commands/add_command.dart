@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
@@ -82,7 +83,11 @@ class AddCommand extends Command<int> {
       }
 
       outFile.parent.createSync(recursive: true);
-      outFile.writeAsStringSync(file.content);
+      if (file.encoding == 'base64') {
+        outFile.writeAsBytesSync(base64.decode(file.content));
+      } else {
+        outFile.writeAsStringSync(file.content);
+      }
       stdout.writeln('Wrote $outPath');
       written++;
     }
