@@ -19,7 +19,7 @@ Future<void> main(List<String> args) async {
     stderr.writeln(e.usage);
     exit(64);
   } catch (e) {
-    // Last-resort guard: never leak a Dart stack trace to the buyer.
+    // Last-resort guard: never leak a Dart stack trace to the user.
     stderr.writeln('Something went wrong: $e');
     exit(1);
   }

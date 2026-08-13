@@ -1,11 +1,12 @@
 # flutterkit_cli
 
-Deliver paid **FlutterKit Pro** screens straight into your Flutter project. Log
-in once with your license key, then pull screens by slug — the CLI fetches the
-screen's files from the FlutterKit endpoint and writes them into your `lib/`.
+Add **FlutterKit** screens straight into your Flutter project. Pull a screen by
+slug — the CLI fetches its files from the FlutterKit endpoint and writes them
+into your `lib/`.
 
-The CLI holds **no secrets**. The only credential it ever sends is your own
-license key.
+FlutterKit is **free**. There is no account, no sign-up, no key and no setup: on
+a fresh machine, `flutterkit add <slug>` just works. The CLI sends no
+credentials of any kind.
 
 ## Install
 
@@ -20,10 +21,8 @@ available.
 
 | Command | What it does |
 | --- | --- |
-| `flutterkit login <license-key>` | Validate your key and save it. |
-| `flutterkit list` | List the screens available to your license. |
+| `flutterkit list` | List the screens available to add. |
 | `flutterkit add <slug>` | Add a screen's files into `lib/`. |
-| `flutterkit logout` | Clear your saved key. |
 | `flutterkit --help` / `--version` | Standard help / version. Per-command help via `flutterkit help <command>`. |
 
 ### `add` flags
@@ -33,10 +32,11 @@ available.
 
 ## Config
 
-Stored at `~/.flutterkit/config.json` (the file is created user-only, `chmod 600`):
+No config file is required. If you want to point the CLI at a different
+endpoint, you can optionally create `~/.flutterkit/config.json`:
 
 ```json
-{ "licenseKey": "...", "apiBase": "..." }
+{ "apiBase": "..." }
 ```
 
 ## API base resolution
@@ -51,7 +51,7 @@ In priority order:
 So the same binary can be pointed at a local endpoint for testing:
 
 ```sh
-flutterkit --api-base http://localhost:3000 login <key>
+flutterkit --api-base http://localhost:3000 list
 ```
 
 ## Develop

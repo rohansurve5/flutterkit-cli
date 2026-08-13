@@ -11,7 +11,7 @@ class ListCommand extends Command<int> {
   final String name = 'list';
 
   @override
-  final String description = 'List the screens available to your license.';
+  final String description = 'List the screens available to add.';
 
   @override
   String get invocation => 'flutterkit list';
@@ -21,12 +21,7 @@ class ListCommand extends Command<int> {
     final config = Config.load();
     final apiBase = resolveApiBase(globalResults?.option('api-base'), config);
 
-    if (config.licenseKey == null) {
-      stderr.writeln('Not logged in. Run: flutterkit login <key>');
-      return 1;
-    }
-
-    final api = ApiClient(apiBase: apiBase, licenseKey: config.licenseKey);
+    final api = ApiClient(apiBase: apiBase);
     final List<ScreenSummary> screens;
     try {
       screens = await api.listScreens();

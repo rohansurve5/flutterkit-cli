@@ -1,8 +1,8 @@
 name: flutterkit_cli
 description: >-
-  Deliver paid FlutterKit Pro screens straight into your Flutter project.
-  Log in with your license key and pull screens by slug.
-version: 0.1.0
+  Add free FlutterKit screens straight into your Flutter project.
+  Pull any screen by slug — no account, no key, no setup.
+version: 0.2.0
 publish_to: none
 
 environment:

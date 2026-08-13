@@ -4,11 +4,9 @@ import 'package:args/command_runner.dart';
 
 import 'commands/add_command.dart';
 import 'commands/list_command.dart';
-import 'commands/login_command.dart';
-import 'commands/logout_command.dart';
 import 'config.dart';
 
-const String version = '0.1.0';
+const String version = '0.2.0';
 
 /// Resolves the API base in priority order:
 /// `--api-base` flag > `FLUTTERKIT_API_BASE` env > config `apiBase` > default.
@@ -25,7 +23,7 @@ class FlutterkitRunner extends CommandRunner<int> {
   FlutterkitRunner()
       : super(
           'flutterkit',
-          'Deliver paid FlutterKit Pro screens into your Flutter project.',
+          'Add free FlutterKit screens to your Flutter project.',
         ) {
     argParser
       ..addFlag(
@@ -40,10 +38,8 @@ class FlutterkitRunner extends CommandRunner<int> {
         valueHelp: 'url',
       );
 
-    addCommand(LoginCommand());
     addCommand(ListCommand());
     addCommand(AddCommand());
-    addCommand(LogoutCommand());
   }
 
   @override

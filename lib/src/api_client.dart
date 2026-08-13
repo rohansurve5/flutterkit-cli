@@ -62,42 +62,26 @@ class ScreenCode {
       );
 }
 
-/// Thin wrapper over the rohansurve Pro screens endpoints.
+/// Thin wrapper over the public FlutterKit screens endpoints.
 ///
-/// The only credential it ever sends is the buyer's own license key, as a
-/// `Authorization: Bearer <key>` header.
+/// FlutterKit is free: these are anonymous GETs. The client sends no
+/// credentials — no key, no token, no account.
 class ApiClient {
-  ApiClient({required this.apiBase, required this.licenseKey, http.Client? client})
+  ApiClient({required this.apiBase, http.Client? client})
       : _client = client ?? http.Client();
 
   final String apiBase;
-  final String? licenseKey;
   final http.Client _client;
 
-  Map<String, String> get _headers => {
-        if (licenseKey != null) 'Authorization': 'Bearer $licenseKey',
-        'Accept': 'application/json',
-      };
+  Map<String, String> get _headers => {'Accept': 'application/json'};
 
   Uri _uri(String path) => Uri.parse('${_trimBase(apiBase)}$path');
 
   static String _trimBase(String base) =>
       base.endsWith('/') ? base.substring(0, base.length - 1) : base;
 
-  /// Validates the configured key. Returns true on 200, false on 401.
-  /// Throws [CliException] for anything else.
-  Future<bool> validateKey() async {
-    final res = await _get('/api/pro/screens');
-    if (res.statusCode == 200) return true;
-    if (res.statusCode == 401) return false;
-    throw _serverError(res.statusCode);
-  }
-
   Future<List<ScreenSummary>> listScreens() async {
     final res = await _get('/api/pro/screens');
-    if (res.statusCode == 401) {
-      throw CliException('Not authorized. Run: flutterkit login <key>');
-    }
     if (res.statusCode != 200) throw _serverError(res.statusCode);
 
     final body = _decode(res.body);
@@ -116,11 +100,9 @@ class ApiClient {
         final body = _decode(res.body);
         if (body is! Map) throw _serverError(res.statusCode);
         return ScreenCode.fromJson(body.cast<String, dynamic>());
-      case 401:
-        throw CliException('Invalid or expired license.');
       case 404:
         throw CliException(
-          "Unknown screen '$slug'. Run `flutterkit list` to see available screens.",
+          "Screen '$slug' not found. Run `flutterkit list` to see available screens.",
         );
       default:
         throw _serverError(res.statusCode);
@@ -148,6 +130,9 @@ class ApiClient {
   }
 
   CliException _serverError(int status) {
+    if (status == 429) {
+      return CliException('Too many requests — please try again later.');
+    }
     if (status >= 500) {
       return CliException('Couldn\'t reach the server, try again.');
     }

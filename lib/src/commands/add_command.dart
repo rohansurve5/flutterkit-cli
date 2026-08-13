@@ -23,7 +23,7 @@ class AddCommand extends Command<int> {
   final String name = 'add';
 
   @override
-  final String description = 'Add a Pro screen to this project by slug.';
+  final String description = 'Add a screen to this project by slug.';
 
   @override
   String get invocation => 'flutterkit add <slug>';
@@ -41,10 +41,6 @@ class AddCommand extends Command<int> {
     final slug = rest.first.trim();
 
     final config = Config.load();
-    if (config.licenseKey == null) {
-      stderr.writeln('Not logged in. Run: flutterkit login <key>');
-      return 1;
-    }
 
     if (!File('pubspec.yaml').existsSync() && !force) {
       stderr.writeln(
@@ -55,7 +51,7 @@ class AddCommand extends Command<int> {
     }
 
     final apiBase = resolveApiBase(globalResults?.option('api-base'), config);
-    final api = ApiClient(apiBase: apiBase, licenseKey: config.licenseKey);
+    final api = ApiClient(apiBase: apiBase);
 
     final ScreenCode screen;
     try {
