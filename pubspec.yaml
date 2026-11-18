@@ -2,7 +2,7 @@ name: flutterkit_cli
 description: >-
   Add free FlutterKit screens straight into your Flutter project.
   Pull any screen by slug — no account, no key, no setup.
-version: 0.2.0
+version: 0.3.0
 publish_to: none
 
 environment:
@@ -18,3 +18,4 @@ dependencies:
 
 dev_dependencies:
   lints: ^5.0.0
+  test: ^1.25.0

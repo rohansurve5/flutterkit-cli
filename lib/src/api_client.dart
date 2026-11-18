@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import 'cli_exception.dart';
+import 'safety.dart';
 
 /// A single file returned by the endpoint for a screen.
 class ScreenFile {
@@ -67,8 +68,10 @@ class ScreenCode {
 /// FlutterKit is free: these are anonymous GETs. The client sends no
 /// credentials — no key, no token, no account.
 class ApiClient {
-  ApiClient({required this.apiBase, http.Client? client})
-      : _client = client ?? http.Client();
+  /// [apiBase] is validated again here so no caller can bypass the allowlist.
+  ApiClient({required String apiBase, http.Client? client})
+      : apiBase = validateApiBase(apiBase, source: 'ApiClient'),
+        _client = client ?? http.Client();
 
   final String apiBase;
   final http.Client _client;
@@ -94,6 +97,7 @@ class ApiClient {
   }
 
   Future<ScreenCode> getScreenCode(String slug) async {
+    validateSlug(slug);
     final res = await _get('/api/pro/screens/$slug/code');
     switch (res.statusCode) {
       case 200:
@@ -109,9 +113,22 @@ class ApiClient {
     }
   }
 
+  /// Redirects are never followed: a 3xx could move the request (and the code
+  /// we install) to another host, so it is reported as an error instead.
   Future<http.Response> _get(String path) async {
     try {
-      return await _client.get(_uri(path), headers: _headers);
+      final req = http.Request('GET', _uri(path))
+        ..followRedirects = false
+        ..headers.addAll(_headers);
+      final res = await http.Response.fromStream(await _client.send(req));
+      if (res.statusCode >= 300 && res.statusCode < 400) {
+        throw CliException(
+          'The server tried to redirect the request '
+          '(HTTP ${res.statusCode}${res.headers['location'] != null ? ' to ${res.headers['location']}' : ''}). '
+          'Redirects are not followed — nothing was installed.',
+        );
+      }
+      return res;
     } on SocketException {
       throw CliException('Couldn\'t reach the server, try again.');
     } on http.ClientException {

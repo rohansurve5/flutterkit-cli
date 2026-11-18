@@ -5,18 +5,33 @@ import 'package:args/command_runner.dart';
 import 'commands/add_command.dart';
 import 'commands/list_command.dart';
 import 'config.dart';
+import 'safety.dart';
 
-const String version = '0.2.0';
+const String version = '0.3.0';
 
 /// Resolves the API base in priority order:
-/// `--api-base` flag > `FLUTTERKIT_API_BASE` env > config `apiBase` > default.
-String resolveApiBase(String? flagValue, Config config) {
-  final fromFlag = (flagValue != null && flagValue.isNotEmpty) ? flagValue : null;
-  final fromEnv = Platform.environment['FLUTTERKIT_API_BASE'];
-  return fromFlag ??
-      (fromEnv != null && fromEnv.isNotEmpty ? fromEnv : null) ??
-      config.apiBase ??
-      Config.defaultApiBase;
+/// `--api-base` flag > `FLUTTERKIT_API_BASE` env > config `apiBase` > default,
+/// then validates it with [validateApiBase] (only https://rohansurve.in, or
+/// http://localhost / http://127.0.0.1 for development). A disallowed value
+/// throws a [CliException] — it never silently falls back to another source.
+String resolveApiBase(
+  String? flagValue,
+  Config config, {
+  Map<String, String>? environment,
+}) {
+  final env = environment ?? Platform.environment;
+  final fromEnv = env['FLUTTERKIT_API_BASE'];
+  if (flagValue != null && flagValue.isNotEmpty) {
+    return validateApiBase(flagValue, source: '--api-base');
+  }
+  if (fromEnv != null && fromEnv.isNotEmpty) {
+    return validateApiBase(fromEnv, source: 'FLUTTERKIT_API_BASE');
+  }
+  final fromConfig = config.apiBase;
+  if (fromConfig != null && fromConfig.isNotEmpty) {
+    return validateApiBase(fromConfig, source: Config.configPath);
+  }
+  return validateApiBase(Config.defaultApiBase, source: 'default');
 }
 
 class FlutterkitRunner extends CommandRunner<int> {

@@ -54,6 +54,18 @@ So the same binary can be pointed at a local endpoint for testing:
 flutterkit --api-base http://localhost:3000 list
 ```
 
+Whatever the source, the value must be exactly `https://rohansurve.in`, or
+`http://localhost[:port]` / `http://127.0.0.1[:port]` for local development.
+Anything else is refused with an error (it never falls back silently).
+
+## Safety
+
+- Every file target from the server must be a relative path inside your
+  project's `lib/` — no `..`, absolute paths, backslashes, or symlinks that
+  lead outside `lib/`. If any file of a screen fails this, **nothing** from
+  that screen is written.
+- HTTP redirects are never followed.
+
 ## Develop
 
 ```sh

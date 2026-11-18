@@ -8,6 +8,7 @@ import '../api_client.dart';
 import '../cli_exception.dart';
 import '../config.dart';
 import '../runner.dart';
+import '../safety.dart';
 
 class AddCommand extends Command<int> {
   AddCommand() {
@@ -38,7 +39,7 @@ class AddCommand extends Command<int> {
         exitCode: 64,
       );
     }
-    final slug = rest.first.trim();
+    final slug = validateSlug(rest.first.trim());
 
     final config = Config.load();
 
@@ -65,26 +66,33 @@ class AddCommand extends Command<int> {
       return 0;
     }
 
+    // Validate EVERY file before writing ANY: one unsafe target or bad
+    // payload refuses the whole screen and nothing is written.
+    final List<PlannedWrite> plan;
+    try {
+      plan = planWrites(screen.files, 'lib');
+    } on CliException catch (e) {
+      throw CliException('${e.message}\nNothing was written.',
+          exitCode: e.exitCode);
+    }
+
     var written = 0;
-    for (final file in screen.files) {
-      final relTarget = _normalizeTarget(file.target);
-      final outPath = p.join('lib', relTarget);
-      final outFile = File(outPath);
+    for (final w in plan) {
+      final shown = p.relative(w.path);
+      final outFile = File(w.path);
 
       if (outFile.existsSync() && !force) {
-        if (!_confirmOverwrite(outPath)) {
-          stdout.writeln('Skipped $outPath');
+        if (!_confirmOverwrite(shown)) {
+          stdout.writeln('Skipped $shown');
           continue;
         }
       }
 
+      // Re-check right before writing (the prompt above may have taken time).
+      ensureNoSymlinkEscape(w.path, 'lib');
       outFile.parent.createSync(recursive: true);
-      if (file.encoding == 'base64') {
-        outFile.writeAsBytesSync(base64.decode(file.content));
-      } else {
-        outFile.writeAsStringSync(file.content);
-      }
-      stdout.writeln('Wrote $outPath');
+      outFile.writeAsBytesSync(w.bytes);
+      stdout.writeln('Wrote $shown');
       written++;
     }
 
@@ -93,20 +101,51 @@ class AddCommand extends Command<int> {
     return 0;
   }
 
-  /// Keeps targets inside `lib/`: strips a leading `lib/` and any leading
-  /// slashes so a target can't escape the project tree.
-  String _normalizeTarget(String target) {
-    var t = target.replaceAll('\\', '/').trim();
-    while (t.startsWith('/')) {
-      t = t.substring(1);
-    }
-    if (t.startsWith('lib/')) t = t.substring(4);
-    return p.normalize(t);
-  }
-
   bool _confirmOverwrite(String path) {
     stdout.write('$path exists. Overwrite? [y/N] ');
     final answer = stdin.readLineSync()?.trim().toLowerCase();
     return answer == 'y' || answer == 'yes';
   }
+}
+
+/// One validated file write: absolute [path] inside `lib/` and its [bytes].
+class PlannedWrite {
+  PlannedWrite(this.path, this.bytes);
+
+  final String path;
+  final List<int> bytes;
+}
+
+/// Validates every [files] entry (target inside [libDir], no symlink escape,
+/// known encoding, decodable content) and returns the writes to perform.
+/// Throws a [CliException] on the first problem — callers write nothing then.
+List<PlannedWrite> planWrites(List<ScreenFile> files, String libDir) {
+  final plan = <PlannedWrite>[];
+  final seen = <String>{};
+  for (final file in files) {
+    final out = resolveTarget(file.target, libDir);
+    ensureNoSymlinkEscape(out, libDir);
+    if (!seen.add(out)) {
+      throw CliException(
+          "Refusing screen: target '${file.target}' appears twice.");
+    }
+    final List<int> bytes;
+    switch (file.encoding) {
+      case 'utf8':
+        bytes = utf8.encode(file.content);
+      case 'base64':
+        try {
+          bytes = base64.decode(file.content);
+        } on FormatException {
+          throw CliException(
+              "Refusing screen: '${file.target}' has invalid base64 content.");
+        }
+      default:
+        throw CliException(
+          "Refusing screen: '${file.target}' has unknown encoding '${file.encoding}'.",
+        );
+    }
+    plan.add(PlannedWrite(out, bytes));
+  }
+  return plan;
 }
