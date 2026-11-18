@@ -159,8 +159,23 @@ void main() {
           p.join(lib, 'wallet_splash', 'a.dart'));
       expect(resolveTarget('lib/wallet_splash/a.dart', lib),
           p.join(lib, 'wallet_splash', 'a.dart'));
-      expect(resolveTarget('a/./b/c.ttf', lib), p.join(lib, 'a', 'b', 'c.ttf'));
     });
+
+    // Near misses of Windows device names / trailing-dot rules are fine.
+    const okNames = [
+      'console.dart',
+      'com10.dart',
+      'lpt.dart',
+      'nul_screen.dart',
+      'auxiliary/aux_screen.dart',
+      'a.b/c.dart',
+      's/.hidden',
+    ];
+    for (final t in okNames) {
+      test('accepts ${jsonEncode(t)}', () {
+        expect(p.isWithin(lib, resolveTarget(t, lib)), isTrue);
+      });
+    }
 
     const bad = [
       '',
@@ -184,6 +199,30 @@ void main() {
       'lib/',
       '.',
       'lib/lib',
+      // Windows strips trailing spaces/dots: '.. ' would act like '..' (#11).
+      '.. /evil.dart',
+      'a/.. /x',
+      'a/... /x',
+      'a./b.dart',
+      'a /b.dart',
+      'x.dart.',
+      'x.dart ',
+      'a/./b/c.ttf', // a '.' part ends in a dot too
+      // Windows device names, any case, with or without extension (#11).
+      'CON',
+      'con.dart',
+      's/NUL.txt',
+      's/nul',
+      'Aux.tar.gz',
+      'prn.dart',
+      'com1',
+      'COM9.log',
+      'lpt1.dart',
+      'LPT9',
+      'com\u00b9.dart',
+      'conin\$',
+      'CONOUT\$.txt',
+      'con .dart',
     ];
     for (final t in bad) {
       test('rejects ${jsonEncode(t)}', () {
@@ -220,13 +259,21 @@ void main() {
       ensureNoSymlinkEscape(resolveTarget('alias/x.dart', lib), lib);
       ensureNoSymlinkEscape(resolveTarget('new/deep/dir/x.dart', lib), lib);
     });
-    test('lib itself being a symlink (monorepo) is fine', () {
-      final realLib = p.join(root.path, 'real_lib')..toString();
-      Directory(realLib).createSync();
+    test('lib itself being a symlink is refused (#13), wherever it points', () {
       final linkedRoot = Directory(p.join(root.path, 'proj'))..createSync();
-      Link(p.join(linkedRoot.path, 'lib')).createSync(realLib);
       final l = p.join(linkedRoot.path, 'lib');
-      ensureNoSymlinkEscape(resolveTarget('a/x.dart', l), l);
+      Link(l).createSync(p.join(root.path, 'outside'));
+      expect(() => ensureNoSymlinkEscape(resolveTarget('a/x.dart', l), l),
+          throwsCli);
+      // A dangling lib link is refused too (it would be created through).
+      Link(l).deleteSync();
+      Link(l).createSync(p.join(root.path, 'missing'));
+      expect(() => ensureNoSymlinkEscape(resolveTarget('a/x.dart', l), l),
+          throwsCli);
+      expect(
+          () => planWrites([ScreenFile(target: 'a/x.dart', content: 'x')], l),
+          throwsCli);
+      expect(Directory(p.join(root.path, 'outside')).listSync(), isEmpty);
     });
   });
 
@@ -340,6 +387,107 @@ void main() {
       );
       final code = await api.getScreenCode('a');
       expect(code.files.single.target, 'lib/a/a.dart');
+    });
+  });
+
+  group('writeFileAtomically (#14, #15)', () {
+    late Directory root;
+    late String lib;
+    late String outside;
+    setUp(() {
+      root = Directory.systemTemp.createTempSync('fk-atomic-');
+      lib = p.join(root.path, 'lib');
+      outside = p.join(root.path, 'outside');
+      Directory(p.join(lib, 's')).createSync(recursive: true);
+      Directory(outside).createSync();
+    });
+    tearDown(() => root.deleteSync(recursive: true));
+
+    List<String> tempFiles() => Directory(root.path)
+        .listSync(recursive: true)
+        .map((e) => p.basename(e.path))
+        .where((n) => n.startsWith('.flutterkit-'))
+        .toList();
+
+    test('writes new files and replaces existing ones; no temp file left', () {
+      final out = resolveTarget('s/new/a.dart', lib);
+      writeFileAtomically(out, utf8.encode('one'), lib);
+      writeFileAtomically(out, utf8.encode('two'), lib);
+      expect(File(out).readAsStringSync(), 'two');
+      expect(tempFiles(), isEmpty);
+    });
+
+    test('a hardlink to an outside file is replaced, never written through',
+        () {
+      final secret = File(p.join(outside, 'secret.txt'))
+        ..writeAsStringSync('ORIGINAL');
+      final out = resolveTarget('s/a.dart', lib);
+      final r = Process.runSync('ln', [secret.path, out]);
+      expect(r.exitCode, 0, reason: '${r.stderr}');
+      writeFileAtomically(out, utf8.encode('NEW'), lib);
+      expect(secret.readAsStringSync(), 'ORIGINAL');
+      expect(File(out).readAsStringSync(), 'NEW');
+    });
+
+    test('a symlink inside lib is replaced by a regular file, not followed',
+        () {
+      final realFile = File(p.join(lib, 's', 'real.dart'))
+        ..writeAsStringSync('REAL');
+      final out = p.join(lib, 's', 'alias.dart');
+      Link(out).createSync(realFile.path);
+      writeFileAtomically(out, utf8.encode('NEW'), lib);
+      expect(realFile.readAsStringSync(), 'REAL');
+      expect(FileSystemEntity.isLinkSync(out), isFalse);
+      expect(File(out).readAsStringSync(), 'NEW');
+    });
+
+    // Swap lib/s for a link to outside/ at each step after the check.
+    void swapToLink() {
+      Directory(p.join(lib, 's')).renameSync(p.join(lib, 's_real'));
+      Link(p.join(lib, 's')).createSync(outside);
+    }
+
+    for (final stage in ['beforeTemp', 'beforeWrite', 'beforeRename']) {
+      test(
+          'folder swapped for a symlink at "$stage" → refused, nothing outside',
+          () {
+        final out = resolveTarget('s/a.dart', lib);
+        expect(
+          () => writeFileAtomically(out, utf8.encode('RACE'), lib,
+              debugHook: (s) {
+            if (s == stage) swapToLink();
+          }),
+          throwsCli,
+        );
+        // Never any content outside lib/ (an unfinished temp file is removed).
+        expect(Directory(outside).listSync(), isEmpty,
+            reason: 'no file (not even a temp file) may remain outside lib/');
+      });
+    }
+  });
+
+  group('safeText (#16)', () {
+    test('removes ANSI/OSC sequences and control characters', () {
+      const evil = '\x1b[2J\x1b[H\x1b]0;pwned\x07\x1b]8;;https://x\x1b\\'
+          'Wallet\x1b[0m\x9b31m\u202eTXT\x00\x7f';
+      final out = safeText(evil);
+      expect(out, 'Wallet31mTXT');
+      expect(
+          out.runes.any((r) => r < 0x20 || (r >= 0x7f && r < 0xa0)), isFalse);
+    });
+    test('keeps ordinary text, emoji and accents; newlines only on request',
+        () {
+      expect(safeText('Café ₹ 🚀 — Fintech'), 'Café ₹ 🚀 — Fintech');
+      expect(safeText('a\nb'), 'a b');
+      expect(safeText('a\nb', keepNewlines: true), 'a\nb');
+    });
+    test('refusal messages quote targets without raw control characters', () {
+      try {
+        resolveTarget('a\x1b[2Jb', 'lib');
+        fail('should refuse');
+      } on CliException catch (e) {
+        expect(e.message.contains('\x1b'), isFalse);
+      }
     });
   });
 }

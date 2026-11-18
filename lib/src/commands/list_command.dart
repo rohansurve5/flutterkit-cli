@@ -5,6 +5,7 @@ import 'package:args/command_runner.dart';
 import '../api_client.dart';
 import '../config.dart';
 import '../runner.dart';
+import '../safety.dart';
 
 class ListCommand extends Command<int> {
   @override
@@ -38,7 +39,15 @@ class ListCommand extends Command<int> {
     return 0;
   }
 
-  void _printTable(List<ScreenSummary> screens) {
+  void _printTable(List<ScreenSummary> raw) {
+    // Server text is printed only after escape/control characters are removed.
+    final screens = raw
+        .map((s) => ScreenSummary(
+              slug: safeText(s.slug),
+              name: safeText(s.name),
+              category: safeText(s.category),
+            ))
+        .toList();
     const slugHeader = 'SLUG';
     const nameHeader = 'NAME';
     const categoryHeader = 'CATEGORY';

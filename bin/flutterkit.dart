@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:flutterkit_cli/src/cli_exception.dart';
 import 'package:flutterkit_cli/src/runner.dart';
+import 'package:flutterkit_cli/src/safety.dart';
 
 Future<void> main(List<String> args) async {
   final runner = FlutterkitRunner();
@@ -10,7 +11,8 @@ Future<void> main(List<String> args) async {
     final code = await runner.run(args);
     exit(code);
   } on CliException catch (e) {
-    stderr.writeln(e.message);
+    // Messages can quote server text; never let it reach the terminal raw.
+    stderr.writeln(safeText(e.message, keepNewlines: true));
     exit(e.exitCode);
   } on UsageException catch (e) {
     // Bad flags / unknown command: print usage to stderr, exit 64.
@@ -20,7 +22,7 @@ Future<void> main(List<String> args) async {
     exit(64);
   } catch (e) {
     // Last-resort guard: never leak a Dart stack trace to the user.
-    stderr.writeln('Something went wrong: $e');
+    stderr.writeln(safeText('Something went wrong: $e', keepNewlines: true));
     exit(1);
   }
 }

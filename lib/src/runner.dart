@@ -7,7 +7,7 @@ import 'commands/list_command.dart';
 import 'config.dart';
 import 'safety.dart';
 
-const String version = '0.3.0';
+const String version = '0.3.1';
 
 /// Resolves the API base in priority order:
 /// `--api-base` flag > `FLUTTERKIT_API_BASE` env > config `apiBase` > default,

@@ -64,6 +64,16 @@ Anything else is refused with an error (it never falls back silently).
   project's `lib/` — no `..`, absolute paths, backslashes, or symlinks that
   lead outside `lib/`. If any file of a screen fails this, **nothing** from
   that screen is written.
+- Path parts that Windows would silently change are refused too: a part
+  ending in a space or dot, and Windows device names (`CON`, `NUL`, `PRN`,
+  `AUX`, `COM1`–`COM9`, `LPT1`–`LPT9`, in any case, with or without an
+  extension).
+- `lib/` itself must be a real folder, not a symlink.
+- Each file is written to a temporary file in its own folder, checked, then
+  renamed into place, so an existing hardlink or symlink is never written
+  through.
+- Text from the server (screen names etc.) is printed with terminal escape
+  and control characters removed.
 - HTTP redirects are never followed.
 
 ## Develop

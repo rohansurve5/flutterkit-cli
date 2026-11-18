@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.3.1
+
+Security hardening (no new features).
+
+- `add` refuses a file target with a path part that ends in a space or dot
+  (Windows strips those, so `.. ` would act like `..`), or that is a Windows
+  device name: `CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9` (also
+  `COM¹²³`/`LPT¹²³`, `CONIN$`, `CONOUT$`), in any case, with or without an
+  extension. A `.` path part is refused too.
+- **Behaviour change:** `add` refuses to run when `lib/` itself is a symlink
+  (0.3.0 allowed it), because every file would land wherever the link points.
+  Run it in the project the link points to.
+- Each file is written to a new temporary file in its own folder, its real
+  location is checked, and it is then renamed into place. An existing
+  hardlink is no longer overwritten in place (its other names keep their
+  content), and a folder swapped for a symlink during the install is caught
+  instead of written through.
+- Screen names, categories and other server text are printed with ANSI/VT
+  escape sequences and control characters removed.
+
 ## 0.3.0
 
 - **Breaking:** the API base (from `--api-base`, `FLUTTERKIT_API_BASE` or the

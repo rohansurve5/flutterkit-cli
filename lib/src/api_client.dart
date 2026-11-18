@@ -32,7 +32,8 @@ class ScreenFile {
 
 /// One screen as listed by `GET /api/pro/screens`.
 class ScreenSummary {
-  ScreenSummary({required this.slug, required this.name, required this.category});
+  ScreenSummary(
+      {required this.slug, required this.name, required this.category});
 
   final String slug;
   final String name;
@@ -124,7 +125,7 @@ class ApiClient {
       if (res.statusCode >= 300 && res.statusCode < 400) {
         throw CliException(
           'The server tried to redirect the request '
-          '(HTTP ${res.statusCode}${res.headers['location'] != null ? ' to ${res.headers['location']}' : ''}). '
+          '(HTTP ${res.statusCode}${res.headers['location'] != null ? ' to ${safeText(res.headers['location']!)}' : ''}). '
           'Redirects are not followed — nothing was installed.',
         );
       }

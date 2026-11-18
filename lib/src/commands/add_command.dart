@@ -61,8 +61,10 @@ class AddCommand extends Command<int> {
       api.close();
     }
 
+    // Server text is printed only after escape/control characters are removed.
+    final name = safeText(screen.name);
     if (screen.files.isEmpty) {
-      stdout.writeln('${screen.name} has no files to add.');
+      stdout.writeln('$name has no files to add.');
       return 0;
     }
 
@@ -88,15 +90,14 @@ class AddCommand extends Command<int> {
         }
       }
 
-      // Re-check right before writing (the prompt above may have taken time).
-      ensureNoSymlinkEscape(w.path, 'lib');
-      outFile.parent.createSync(recursive: true);
-      outFile.writeAsBytesSync(w.bytes);
+      // Checked again at write time: temp file in the same folder, verified,
+      // then renamed into place (never writes through a hardlink or symlink).
+      writeFileAtomically(w.path, w.bytes, 'lib');
       stdout.writeln('Wrote $shown');
       written++;
     }
 
-    stdout.writeln('Added ${screen.name} — $written '
+    stdout.writeln('Added $name — $written '
         '${written == 1 ? 'file' : 'files'}');
     return 0;
   }
@@ -127,7 +128,7 @@ List<PlannedWrite> planWrites(List<ScreenFile> files, String libDir) {
     ensureNoSymlinkEscape(out, libDir);
     if (!seen.add(out)) {
       throw CliException(
-          "Refusing screen: target '${file.target}' appears twice.");
+          "Refusing screen: target '${safeText(file.target)}' appears twice.");
     }
     final List<int> bytes;
     switch (file.encoding) {
@@ -138,11 +139,11 @@ List<PlannedWrite> planWrites(List<ScreenFile> files, String libDir) {
           bytes = base64.decode(file.content);
         } on FormatException {
           throw CliException(
-              "Refusing screen: '${file.target}' has invalid base64 content.");
+              "Refusing screen: '${safeText(file.target)}' has invalid base64 content.");
         }
       default:
         throw CliException(
-          "Refusing screen: '${file.target}' has unknown encoding '${file.encoding}'.",
+          "Refusing screen: '${safeText(file.target)}' has unknown encoding '${safeText(file.encoding)}'.",
         );
     }
     plan.add(PlannedWrite(out, bytes));
