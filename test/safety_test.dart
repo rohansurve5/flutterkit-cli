@@ -275,6 +275,20 @@ void main() {
           throwsCli);
       expect(Directory(p.join(root.path, 'outside')).listSync(), isEmpty);
     });
+    test('the symlinked-lib error is one line saying what is wrong and the fix',
+        () {
+      final linkedRoot = Directory(p.join(root.path, 'proj2'))..createSync();
+      final l = p.join(linkedRoot.path, 'lib');
+      Link(l).createSync(p.join(root.path, 'outside'));
+      try {
+        ensureNoSymlinkEscape(resolveTarget('a/x.dart', l), l);
+        fail('should refuse');
+      } on CliException catch (e) {
+        expect(e.message, isNot(contains('\n')));
+        expect(e.message, contains('lib/ is a symlink'));
+        expect(e.message, contains('replace the link with a real lib/ folder'));
+      }
+    });
   });
 
   group('planWrites (all-or-nothing)', () {

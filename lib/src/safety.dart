@@ -144,9 +144,11 @@ void ensureNoSymlinkEscape(String outPath, String libDir) {
   // lib/ itself must be a real folder: a lib/ symlink would send every file
   // wherever it points, outside this project.
   if (FileSystemEntity.isLinkSync(libAbs)) {
+    // One line: what is wrong, then how to fix it.
     throw CliException(
-      "Refusing to write: '${p.relative(libAbs)}' is a symlink. FlutterKit only "
-      'writes into a real lib/ folder — run it in the project the link points to.',
+      'Nothing installed: lib/ is a symlink, and FlutterKit only writes into a '
+      'real lib/ folder — replace the link with a real lib/ folder, or run '
+      'flutterkit add from the project the link points to.',
     );
   }
   // lib/ will be created fresh, so there are no links to follow.
